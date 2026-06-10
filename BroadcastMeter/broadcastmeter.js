@@ -1,3 +1,20 @@
+//////////////////////////////////////////////////////////////////////////////////////
+///                                                                                ///
+///  BROADCAST METER FOR FM-DX-WEBSERVER (V0.5.1)                                  ///
+///                                                                                ///
+///  RF signal and audio modulation meter with broadcast-style status indicators.  ///
+///                                                                                ///
+///  Features: RF meter, audio meter, peak hold, ST/RDS/CLIP LEDs, compact mode    ///
+///  and native FM-DX Webserver theme integration.                                 ///
+///                                                                                ///
+///  Developed in Finland by Janne Heinikangas / JanneDX                           ///
+///                                                                                ///
+///  Feedback and ideas are welcome!                                               ///
+///                                                                                ///
+///  73! JanneDX                                                                   ///
+///                                                                                ///
+//////////////////////////////////////////////////////////////////////////////////////
+
 (() => {
     'use strict';
 
