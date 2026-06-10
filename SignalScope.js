@@ -1,8 +1,8 @@
 var pluginConfig = {
-    name: 'Broadcast Meter',
+    name: 'Signal Scope',
     version: '0.5.1',
     author: 'JanneDX',
-    frontEndPath: 'BroadcastMeter/broadcastmeter.js'
+    frontEndPath: 'SignalScope/signalscope.js'
 }
 
 module.exports = {

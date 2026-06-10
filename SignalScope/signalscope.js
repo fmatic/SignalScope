@@ -1,6 +1,10 @@
 //////////////////////////////////////////////////////////////////////////////////////
 ///                                                                                ///
+<<<<<<< HEAD
 ///  BROADCAST METER FOR FM-DX-WEBSERVER (V0.5.1)                                  ///
+=======
+///  SIGNAL SCOPE FOR FM-DX-WEBSERVER (V0.5.1)                                  ///
+>>>>>>> 299e94a ( Signal Scope)
 ///                                                                                ///
 ///  RF signal and audio modulation meter with broadcast-style status indicators.  ///
 ///                                                                                ///
@@ -18,7 +22,11 @@
 (() => {
     'use strict';
 
+<<<<<<< HEAD
     const pluginName = 'Broadcast Meter';
+=======
+    const pluginName = 'Signal Scope';
+>>>>>>> 299e94a ( Signal Scope)
     const pluginVersion = '0.5.1';
     const AUDIO_SENSITIVITY = 520;
     const AUDIO_NOISE_FLOOR = 0.012;
@@ -27,8 +35,13 @@
 
     const pluginSetupOnlyNotify = true;
     const CHECK_FOR_UPDATES = true;
+<<<<<<< HEAD
     const pluginHomepageUrl = 'https://github.com/fmatic/BroadcastMeter/releases';
     const pluginUpdateUrl = 'https://raw.githubusercontent.com/fmatic/BroadcastMeter/main/BroadcastMeter/broadcastmeter.js';
+=======
+    const pluginHomepageUrl = 'https://github.com/fmatic/SignalScope/releases';
+    const pluginUpdateUrl = 'https://raw.githubusercontent.com/fmatic/SignalScope/main/SignalScope/signalscope.js';
+>>>>>>> 299e94a ( Signal Scope)
 
     let stereoActive = false;
     let forcedMonoActive = false;
@@ -132,9 +145,15 @@
                 document.querySelector('.wrapper-outer .sidenav-content') ||
                 document.querySelector('.sidenav-content');
 
+<<<<<<< HEAD
             if (updateIcon && !document.getElementById('broadcast-meter-update-dot')) {
                 const redDot = document.createElement('span');
                 redDot.id = 'broadcast-meter-update-dot';
+=======
+            if (updateIcon && !document.getElementById('signal-scope-update-dot')) {
+                const redDot = document.createElement('span');
+                redDot.id = 'signal-scope-update-dot';
+>>>>>>> 299e94a ( Signal Scope)
                 redDot.style.display = 'block';
                 redDot.style.width = '12px';
                 redDot.style.height = '12px';
@@ -224,14 +243,22 @@
 
         const panel = document.createElement('div');
         panel.className = 'panel-33';
+<<<<<<< HEAD
         panel.id = 'mono-peakmeter-container';
+=======
+        panel.id = 'signal-scope-container';
+>>>>>>> 299e94a ( Signal Scope)
         panel.style.width = '33%';
         panel.style.height = COMPACT_MODE ? '96px' : '123px';
         panel.style.position = 'relative';
         panel.style.overflow = 'hidden';
 
         const title = document.createElement('h2');
+<<<<<<< HEAD
         title.textContent = 'BROADCAST METER';
+=======
+        title.textContent = 'SIGNAL SCOPE';
+>>>>>>> 299e94a ( Signal Scope)
         title.style.letterSpacing = '1px';
 
         if (COMPACT_MODE) {
@@ -247,7 +274,11 @@
         panel.appendChild(title);
 
         canvas = document.createElement('canvas');
+<<<<<<< HEAD
         canvas.id = 'mono-peakmeter-canvas';
+=======
+        canvas.id = 'signal-scope-canvas';
+>>>>>>> 299e94a ( Signal Scope)
         canvas.width = 320;
         canvas.height = COMPACT_MODE ? 44 : 74;
         canvas.title = `${pluginName} ${pluginVersion}`;
@@ -273,24 +304,40 @@
         const style = document.createElement('style');
 
         style.textContent = `
+<<<<<<< HEAD
         #mono-peakmeter-container {
+=======
+        #msignal-scope-container {
+>>>>>>> 299e94a ( Signal Scope)
             background: transparent !important;
             backdrop-filter: none !important;
             border-radius: 0;
             box-shadow: none;
         }
 
+<<<<<<< HEAD
        #mono-peakmeter-container h2 {
     text-shadow: none !important;
 }
         @media only screen and (max-width: 768px) {
             #mono-peakmeter-container {
+=======
+       #msignal-scope-container h2 {
+    text-shadow: none !important;
+}
+        @media only screen and (max-width: 768px) {
+            #signal-scope-container {
+>>>>>>> 299e94a ( Signal Scope)
                 width: 100% !important;
                 height: 118px;
                 margin-top: 8px;
             }
 
+<<<<<<< HEAD
             #mono-peakmeter-canvas {
+=======
+            #signal-scope-canvas {
+>>>>>>> 299e94a ( Signal Scope)
                 width: 300px !important;
             }
         }
@@ -550,4 +597,8 @@
         return Math.max(min, Math.min(max, value));
     }
 
+<<<<<<< HEAD
 })();
+=======
+})();
+>>>>>>> 299e94a ( Signal Scope)
