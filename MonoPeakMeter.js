@@ -1,6 +1,6 @@
 var pluginConfig = {
     name: 'Mono Peakmeter',
-    version: '0.3.0',
+    version: '0.4.0',
     author: 'JanneDX',
     frontEndPath: 'MonoPeakMeter/monopeakmeter.js'
 }
