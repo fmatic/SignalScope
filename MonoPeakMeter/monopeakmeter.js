@@ -2,10 +2,11 @@
     'use strict';
 
     const pluginName = 'Mono Peakmeter';
-    const pluginVersion = '0.4.0';
+    const pluginVersion = '0.5.0';
     const AUDIO_SENSITIVITY = 520;
     const AUDIO_NOISE_FLOOR = 0.012;
     const CLIP_THRESHOLD = 98;
+    const COMPACT_MODE = false;
 
     let clipHold = 0;
     let canvas;
@@ -29,6 +30,23 @@
         initAudio();
         startRenderLoop();
     });
+
+    function cssVar(name, fallback) {
+        const value = getComputedStyle(document.documentElement)
+            .getPropertyValue(name)
+            .trim();
+
+        return value || fallback;
+    }
+
+    function getThemeColors() {
+        return {
+            text: cssVar('--color-text', '#d9ffff'),
+            accent: cssVar('--color-5', '#00ff66'),
+            panelBg: cssVar('--color-2-transparent', 'rgba(10, 25, 28, 0.95)'),
+            border: cssVar('--color-3-transparent', 'rgba(200, 255, 255, 0.16)')
+        };
+    }
 
     function initAudio() {
         if (audioConnected)
@@ -99,26 +117,40 @@
         panel.className = 'panel-33';
         panel.id = 'mono-peakmeter-container';
         panel.style.width = '33%';
-        panel.style.height = '123px';
+        panel.style.height = COMPACT_MODE ? '96px' : '123px';
         panel.style.position = 'relative';
         panel.style.overflow = 'hidden';
 
         const title = document.createElement('h2');
         title.textContent = 'MONO PEAKMETER';
-        title.style.marginTop = '12px';
         title.style.letterSpacing = '1px';
+
+        if (COMPACT_MODE) {
+            title.style.fontSize = '22px';
+            title.style.opacity = '0.85';
+            title.style.marginTop = '8px';
+            title.style.marginBottom = '0';
+        } else {
+            title.style.marginTop = '4';
+            title.style.marginBottom = '0';
+        }
+
+        panel.appendChild(title);
 
         canvas = document.createElement('canvas');
         canvas.id = 'mono-peakmeter-canvas';
         canvas.width = 320;
-        canvas.height = 74;
+        canvas.height = COMPACT_MODE ? 44 : 74;
         canvas.title = `${pluginName} ${pluginVersion}`;
-        canvas.style.width = '90%';
-        canvas.style.maxWidth = '340px';
-        canvas.style.height = '74px';
+        canvas.style.width = COMPACT_MODE ? '260px' : '90%';
+        canvas.style.maxWidth = COMPACT_MODE ? '260px' : '340px';
+        canvas.style.height = COMPACT_MODE ? '44px' : '74px';
+        canvas.style.marginTop = COMPACT_MODE ? '-2px' : '0';
+        canvas.style.marginLeft = COMPACT_MODE ? 'auto' : '0';
+        canvas.style.marginRight = COMPACT_MODE ? 'auto' : '0';
+        canvas.style.display = 'block';
         canvas.style.imageRendering = 'auto';
 
-        panel.appendChild(title);
         panel.appendChild(canvas);
 
         signalPanel.parentNode.insertBefore(panel, signalPanel.nextSibling);
@@ -139,11 +171,9 @@
             box-shadow: none;
         }
 
-        #mono-peakmeter-container h2 {
-            color: rgba(180, 255, 250, 0.85);
-            text-shadow: 0 0 8px rgba(0, 255, 220, 0.25);
-        }
-
+       #mono-peakmeter-container h2 {
+    text-shadow: none !important;
+}
         @media only screen and (max-width: 768px) {
             #mono-peakmeter-container {
                 width: 100% !important;
@@ -187,18 +217,18 @@
 
         drawBar({
             label: 'S',
-            y: 8,
+            y: COMPACT_MODE ? 5 : 8,
             value: sValue,
-            scale: ['1', '3', '5', '7', '9', '+10', '+20', '+30', '+40'],
-            ticks: [10, 22, 34, 46, 58, 68, 78, 88, 98]
+            scale: COMPACT_MODE ? [] : ['1', '3', '5', '7', '9', '+10', '+20', '+30', '+40'],
+            ticks: COMPACT_MODE ? [] : [10, 22, 34, 46, 58, 68, 78, 88, 98]
         });
 
         drawBar({
             label: 'A',
-            y: 42,
+            y: COMPACT_MODE ? 24 : 42,
             value: aValue,
-            scale: ['0', '10', '30', '50', '70', '100'],
-            ticks: [0, 10, 30, 50, 70, 100]
+            scale: COMPACT_MODE ? [] : ['0', '10', '30', '50', '70', '100'],
+            ticks: COMPACT_MODE ? [] : [0, 10, 30, 50, 70, 100]
         });
 
         drawClipIndicator();
@@ -211,24 +241,26 @@
         scale,
         ticks
     }) {
-        const x = 36;
-        const w = 250;
-        const h = 7;
+        const x = COMPACT_MODE ? 22 : 36;
+        const w = COMPACT_MODE ? 230 : 250;
+        const h = COMPACT_MODE ? 8 : 7;
 
         const fillW = clamp((value / 100) * w, 0, w);
+        const theme = getThemeColors();
 
         ctx.font = 'bold 11px Arial, sans-serif';
-        ctx.fillStyle = '#d9ffff';
+        ctx.fillStyle = theme.text;
         ctx.textAlign = 'right';
         ctx.fillText(label, x - 8, y + 7);
 
         // Background
-        ctx.fillStyle = 'rgba(10, 25, 28, 0.95)';
+        ctx.fillStyle = theme.panelBg;
         ctx.fillRect(x, y, w, h);
 
         // Gradient fill
         const gradient = ctx.createLinearGradient(x, 0, x + w, 0);
-        gradient.addColorStop(0.0, '#00ff66');
+
+        gradient.addColorStop(0.0, theme.accent);
         gradient.addColorStop(0.68, '#9dff00');
         gradient.addColorStop(0.84, '#ffd000');
         gradient.addColorStop(1.0, '#ff3030');
@@ -272,42 +304,29 @@
         ctx.fillRect(x, y, fillW, 1);
 
         // Border
-        ctx.strokeStyle = 'rgba(200, 255, 255, 0.16)';
+        ctx.strokeStyle = theme.border;
         ctx.strokeRect(x, y, w, h);
 
         // Ticks and labels
-        ctx.font = '10px Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffffff';
+        if (!COMPACT_MODE) {
+            ctx.font = '10px Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = theme.text;
 
-        ticks.forEach((tick, i) => {
-            const tx = x + (tick / 100) * w;
+            ticks.forEach((tick, i) => {
+                const tx = x + (tick / 100) * w;
 
-            ctx.strokeStyle = 'rgba(255,255,255,0.65)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(tx, y + h + 1);
-            ctx.lineTo(tx, y + h + 4);
-            ctx.stroke();
+                ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(tx, y + h + 1);
+                ctx.lineTo(tx, y + h + 4);
+                ctx.stroke();
 
-            if (scale[i]) {
-                ctx.fillText(scale[i], tx, y + h + 16);
-            }
-        });
-    }
-
-    function drawStereoIndicator() {
-        stereoState = readStereoState();
-
-        ctx.font = 'bold 10px Arial, sans-serif';
-        ctx.textAlign = 'right';
-
-        if (stereoState) {
-            ctx.fillStyle = 'rgba(170, 255, 255, 0.95)';
-            ctx.fillText('◎ STEREO', canvas.width - 18, 34);
-        } else {
-            ctx.fillStyle = 'rgba(170, 255, 255, 0.55)';
-            ctx.fillText('● MONO', canvas.width - 18, 34);
+                if (scale[i]) {
+                    ctx.fillText(scale[i], tx, y + h + 16);
+                }
+            });
         }
     }
 
@@ -359,10 +378,4 @@
         return Math.max(min, Math.min(max, value));
     }
 
-    function drawSegment(x, y, w, h, color) {
-        if (w <= 0)
-            return;
-        ctx.fillStyle = color;
-        ctx.fillRect(x, y, w, h);
-    }
 })();
