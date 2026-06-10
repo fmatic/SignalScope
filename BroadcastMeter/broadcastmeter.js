@@ -8,6 +8,11 @@
     const CLIP_THRESHOLD = 98;
     const COMPACT_MODE = false;
 
+    const pluginSetupOnlyNotify = true;
+    const CHECK_FOR_UPDATES = true;
+    const pluginHomepageUrl = 'https://github.com/fmatic/BroadcastMeter/releases';
+    const pluginUpdateUrl = 'https://raw.githubusercontent.com/fmatic/BroadcastMeter/main/BroadcastMeter/broadcastmeter.js';
+
     let stereoActive = false;
     let forcedMonoActive = false;
     let rdsActive = false;
@@ -31,6 +36,10 @@
     let peakS = 0;
     let peakA = 0;
 
+    if (CHECK_FOR_UPDATES) {
+        checkUpdate(pluginSetupOnlyNotify, pluginName, pluginHomepageUrl, pluginUpdateUrl);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         createPanel();
         initAudio();
@@ -52,6 +61,84 @@
             panelBg: cssVar('--color-2-transparent', 'rgba(10, 25, 28, 0.95)'),
             border: cssVar('--color-3-transparent', 'rgba(200, 255, 255, 0.16)')
         };
+    }
+
+    function checkUpdate(setupOnly, pluginName, urlUpdateLink, urlFetchLink) {
+        if (setupOnly && window.location.pathname !== '/setup')
+            return;
+
+        async function fetchRemoteVersion() {
+            try {
+                const response = await fetch(urlFetchLink, {
+                    cache: 'no-store'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`[${pluginName}] update check HTTP error: ${response.status}`);
+                }
+
+                const text = await response.text();
+                const versionLine = text
+                    .split('\n')
+                    .find(line => line.includes('const pluginVersion ='));
+
+                if (!versionLine)
+                    return null;
+
+                const match = versionLine.match(/const\s+pluginVersion\s*=\s*['"]([^'"]+)['"]/);
+
+                return match ? match[1] : null;
+            } catch (error) {
+                console.error(`[${pluginName}] update check failed:`, error);
+                return null;
+            }
+        }
+
+        function notifyUpdate(currentVersion, newVersion) {
+            if (window.location.pathname !== '/setup')
+                return;
+
+            const pluginSettings = document.getElementById('plugin-settings');
+
+            if (pluginSettings) {
+                const updateText = `<a href="${urlUpdateLink}" target="_blank">[${pluginName}] Update available: ${currentVersion} → ${newVersion}</a><br>`;
+
+                if (pluginSettings.textContent.trim() === 'No plugin settings are available.') {
+                    pluginSettings.innerHTML = updateText;
+                } else if (!pluginSettings.innerHTML.includes(`[${pluginName}] Update available`)) {
+                    pluginSettings.innerHTML += ' ' + updateText;
+                }
+            }
+
+            const updateIcon =
+                document.querySelector('.wrapper-outer #navigation .sidenav-content .fa-puzzle-piece') ||
+                document.querySelector('.wrapper-outer .sidenav-content') ||
+                document.querySelector('.sidenav-content');
+
+            if (updateIcon && !document.getElementById('broadcast-meter-update-dot')) {
+                const redDot = document.createElement('span');
+                redDot.id = 'broadcast-meter-update-dot';
+                redDot.style.display = 'block';
+                redDot.style.width = '12px';
+                redDot.style.height = '12px';
+                redDot.style.borderRadius = '50%';
+                redDot.style.backgroundColor = '#FE0830';
+                redDot.style.marginLeft = '82px';
+                redDot.style.marginTop = '-12px';
+
+                updateIcon.appendChild(redDot);
+            }
+        }
+
+        fetchRemoteVersion().then(newVersion => {
+            if (!newVersion)
+                return;
+
+            if (newVersion !== pluginVersion) {
+                console.log(`[${pluginName}] Update available: ${pluginVersion} → ${newVersion}`);
+                notifyUpdate(pluginVersion, newVersion);
+            }
+        });
     }
 
     function initAudio() {
@@ -364,15 +451,15 @@
         return false;
     }
 
-function detectStereoFromUi() {
-    const stereo = document.querySelector('.stereo-container .circle-container');
+    function detectStereoFromUi() {
+        const stereo = document.querySelector('.stereo-container .circle-container');
 
-    if (!stereo) {
-        return false;
+        if (!stereo) {
+            return false;
+        }
+
+        return !stereo.classList.contains('opacity-half');
     }
-
-    return !stereo.classList.contains('opacity-half');
-}
 
     function drawIndicators() {
         const startX = 62;
