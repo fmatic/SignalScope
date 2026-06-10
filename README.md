@@ -11,6 +11,8 @@ A modern RF/audio peak meter plugin for FM-DX Webserver inspired by professional
 
 Designed especially for FM-DX monitoring with smooth animations, peak hold indicators and lightweight canvas rendering.
 
+Formerly known as: Mono Peakmeter
+
 ---
 
 ## Features
