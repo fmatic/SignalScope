@@ -5,7 +5,7 @@
 ![Version](https://img.shields.io/badge/version-0.5.0-00c8ff?style=flat-square)
 [![Support my work](https://img.shields.io/badge/Support-My%20Work-333333?style=flat-square&logo=buymeacoffee&logoColor=white)](https://buymeacoffee.com/jannedx)
 
-![Broadcast Meter Demo](docs/IMG_5430.GIF)
+![Broadcast Meter Demo](docs/IMG_5472.GIF)
 
 A modern RF/audio peak meter plugin for FM-DX Webserver inspired by professional broadcast monitor equipment and classic studio peak meters.
 
