@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////////////////////////
 ///                                                                                ///
-///  SIGNAL SCOPE FOR FM-DX-WEBSERVER (V0.5.3)                                     ///
+///  SIGNAL SCOPE FOR FM-DX-WEBSERVER (V0.5.4)                                     ///
 ///                                                                                ///
 ///  RF signal and audio modulation meter with broadcast-style status indicators.  ///
 ///                                                                                ///
@@ -19,7 +19,7 @@
     'use strict';
 
     const pluginName = 'Signal Scope';
-    const pluginVersion = '0.5.3';
+    const pluginVersion = '0.5.4';
     const AUDIO_SENSITIVITY = 520;
     const AUDIO_NOISE_FLOOR = 0.012;
     const CLIP_THRESHOLD = 98;
@@ -32,6 +32,7 @@
     const STORAGE_GLASS = 'SIGNAL_SCOPE_GLASS';
     const STORAGE_SIZE = 'SIGNAL_SCOPE_SIZE';
     const STORAGE_PEAK_DECAY = 'SIGNAL_SCOPE_PEAK_DECAY';
+    const STORAGE_VALUE_TEXT = 'SIGNAL_SCOPE_VALUE_TEXT';
 
     const DEFAULT_THEME = 'webserver';
     const DEFAULT_METER_STYLE = 'classic';
@@ -40,6 +41,7 @@
     const DEFAULT_GLASS = 'off';
     const DEFAULT_SIZE = 'normal';
     const DEFAULT_PEAK_DECAY = 'normal';
+    const DEFAULT_VALUE_TEXT = 'off';
 
     const VALID_THEMES = [
         'webserver',
@@ -80,6 +82,11 @@
         'fast',
         'normal',
         'slow'
+    ];
+
+    const VALID_VALUE_TEXT = [
+        'off',
+        'on'
     ];
 
     const SIGNAL_SCOPE_THEMES = {
@@ -133,6 +140,7 @@
     let activeGlassMode = loadGlassMode();
     let activeSizeMode = loadSizeMode();
     let activePeakDecay = loadPeakDecay();
+    let activeValueText = loadValueText();
     let themeTransition = 0;
 
     const pluginSetupOnlyNotify = true;
@@ -266,6 +274,10 @@
         return loadEnum(STORAGE_PEAK_DECAY, DEFAULT_PEAK_DECAY, VALID_PEAK_DECAY);
     }
 
+    function loadValueText() {
+        return loadEnum(STORAGE_VALUE_TEXT, DEFAULT_VALUE_TEXT, VALID_VALUE_TEXT);
+    }
+
     function getThemeColors() {
         const palette = getActiveThemePalette();
 
@@ -319,9 +331,9 @@
                 panelHeight: '96px',
                 canvasWidth: 290,
                 canvasHeight: 64,
-                canvasCssWidth: '250px',
+                canvasCssWidth: '270px',
                 canvasCssHeight: '64px',
-                titleFontSize: '20px'
+                titleFontSize: '18px'
             };
         }
 
@@ -348,16 +360,34 @@
 
     function applyGlassMode(panel) {
         if (activeGlassMode === 'on') {
-            panel.style.background = 'rgba(8, 18, 26, 0.28)';
-            panel.style.backdropFilter = 'blur(8px)';
+
+            panel.style.background =
+                'linear-gradient(to bottom, ' +
+                'rgba(120,220,255,0.05) 0%, ' +
+                'rgba(8,18,26,0.22) 18%, ' +
+                'rgba(8,18,26,0.16) 100%)';
+
+            panel.style.backdropFilter = 'blur(14px)';
+            panel.style.webkitBackdropFilter = 'blur(14px)';
+
             panel.style.borderRadius = '12px';
-            panel.style.boxShadow = 'inset 0 0 18px rgba(255,255,255,0.04), 0 0 18px rgba(0,0,0,0.22)';
+
+            panel.style.border =
+                '1px solid rgba(180,240,255,0.06)';
+
+            panel.style.boxShadow =
+                'inset 0 1px 0 rgba(255,255,255,0.05),' +
+                'inset 0 0 18px rgba(255,255,255,0.03),' +
+                '0 0 18px rgba(0,0,0,0.22)';
+
             return;
         }
 
         panel.style.background = 'transparent';
         panel.style.backdropFilter = 'none';
+        panel.style.webkitBackdropFilter = 'none';
         panel.style.borderRadius = '0';
+        panel.style.border = 'none';
         panel.style.boxShadow = 'none';
     }
 
@@ -650,6 +680,21 @@
 
     }
 
+    function drawTopGlow() {
+        const glow = ctx.createLinearGradient(0, 0, 0, 26);
+
+        glow.addColorStop(0, 'rgba(120,220,255,0.14)');
+        glow.addColorStop(0.45, 'rgba(120,220,255,0.05)');
+        glow.addColorStop(1, 'rgba(120,220,255,0)');
+
+        ctx.save();
+
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, canvas.width, 26);
+
+        ctx.restore();
+    }
+
     function drawThemeTransitionFlash() {
         if (!themeTransition || themeTransition <= 0)
             return;
@@ -748,6 +793,7 @@
         }
 
         // Ticks and labels
+        drawValueText(label, value, x, y, w, theme);
         if (!COMPACT_MODE) {
             ctx.font = '10px Arial, sans-serif';
             ctx.textAlign = 'center';
@@ -773,8 +819,8 @@
     function getMeterLayout() {
         if (activeSizeMode === 'mini') {
             return {
-                sY: 14,
-                aY: 42
+                sY: 13,
+                aY: 40
             };
         }
 
@@ -794,8 +840,8 @@
     function getMeterGeometry(defaultHeight) {
         if (activeSizeMode === 'mini') {
             return {
-                x: 42,
-                w: 205,
+                x: 36,
+                w: 220,
                 h: defaultHeight
             };
         }
@@ -824,6 +870,10 @@
         gear.style.position = 'absolute';
         gear.style.top = '6px';
         gear.style.right = '10px';
+        if (window.innerWidth < 600) {
+            gear.style.right = '18px';
+            gear.style.top = '8px';
+        }
         gear.style.fontSize = '15px';
         gear.style.cursor = 'pointer';
         gear.style.opacity = '0.18';
@@ -907,7 +957,7 @@
         Signal Scope
     </div>
 
-    <label style="display:block;margin-bottom:8px;">Theme</label>
+    ${buildSectionLabel('Theme')}
 
 <div id="signal-scope-theme-list" style="
     display:flex;
@@ -918,7 +968,7 @@
     ${buildThemeRows()}
 </div>
 
-  <label style="display:block;margin-bottom:8px;">Meter Style</label>
+  ${buildSectionLabel('Meter Style')}
 
 <div id="signal-scope-style-list" style="
     display:flex;
@@ -928,9 +978,7 @@
     ${buildMeterStyleRows()}
 </div>
 
-<label style="display:block;margin-top:14px;margin-bottom:8px;">
-    Glow
-</label>
+${buildSectionLabel('Glow')}
 
 <div style="
     display:flex;
@@ -953,9 +1001,7 @@
                 ], activeGlowLevel, 'glow')}
 </div>
 
-<label style="display:block;margin-top:14px;margin-bottom:8px;">
-    Peak Hold
-</label>
+${buildSectionLabel('Peak Hold')}
 
 <div style="
     display:flex;
@@ -978,9 +1024,26 @@
                 ], activePeakDecay, 'peak')}
 </div>
 
-<label style="display:block;margin-top:14px;margin-bottom:8px;">
-    Glass Panel
-</label>
+${buildSectionLabel('Value Text')}
+
+<div style="
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+">
+    ${buildOptionRows([{
+                        label: 'Off',
+                        value: 'off',
+                        preview: '—'
+                    }, {
+                        label: 'On',
+                        value: 'on',
+                        preview: '●'
+                    }
+                ], activeValueText, 'valueText')}
+</div>
+
+${buildSectionLabel('Glass Panel')}
 
 <div style="
     display:flex;
@@ -999,9 +1062,7 @@
                 ], activeGlassMode, 'glass')}
 </div>
 
-<label style="display:block;margin-top:14px;margin-bottom:8px;">
-    Panel Size
-</label>
+${buildSectionLabel('Panel Size')}
 
 <div style="
     display:flex;
@@ -1096,6 +1157,11 @@
                 if (type === 'peak') {
                     activePeakDecay = value;
                     safeLSSet(STORAGE_PEAK_DECAY, value);
+                }
+
+                if (type === 'valueText') {
+                    activeValueText = value;
+                    safeLSSet(STORAGE_VALUE_TEXT, value);
                 }
 
                 if (type === 'glass') {
@@ -1213,7 +1279,9 @@
             ctx.lineTo(peakX, y + h + 5);
             ctx.stroke();
             ctx.shadowBlur = 0;
+
         }
+        drawValueText(label, value, x, y, w, theme);
     }
 
     function drawNeonBar({
@@ -1264,6 +1332,7 @@
         }
 
         if (!COMPACT_MODE) {
+            drawValueText(label, value, x, y, w, theme);
             drawScaleTicks(x, y, w, h, scale, ticks, theme);
         }
     }
@@ -1310,6 +1379,32 @@
         });
     }
 
+    function drawValueText(label, value, x, y, w, theme) {
+        if (activeValueText !== 'on') {
+            return;
+        }
+
+        const text = `${Math.round(value)}`;
+        const badgeW = 24;
+        const badgeH = 13;
+        const badgeX = x + w + 6;
+        const badgeY = y - 3;
+
+        ctx.save();
+
+        ctx.globalAlpha = 0.72;
+        ctx.fillStyle = 'rgba(8, 18, 26, 0.18)';
+        roundRect(ctx, badgeX, badgeY, badgeW, badgeH, 4, true, false);
+
+        ctx.globalAlpha = 0.95;
+        ctx.font = 'bold 9px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = theme.text;
+        ctx.fillText(text, badgeX + badgeW / 2, badgeY + badgeH / 2 + 0.5);
+
+        ctx.restore();
+    }
     function getStylePreviewColor(style) {
         const theme = getThemeColors();
 
@@ -1431,6 +1526,23 @@
         `;
         }).join('');
 
+    }
+
+    function buildSectionLabel(text) {
+        return `
+        <label style="
+            display:block;
+            margin-top:14px;
+            margin-bottom:7px;
+            font-size:11px;
+            letter-spacing:0.8px;
+            text-transform:uppercase;
+            opacity:0.72;
+            color:var(--color-text);
+        ">
+            ${text}
+        </label>
+    `;
     }
 
     function buildOptionRows(options, activeValue, type) {
@@ -1569,6 +1681,7 @@
         ctx.strokeRect(x, y, w, h);
 
         // Ticks and labels
+        drawValueText(label, value, x, y, w, theme);
         if (!COMPACT_MODE) {
             ctx.font = '10px Arial, sans-serif';
             ctx.textAlign = 'center';
