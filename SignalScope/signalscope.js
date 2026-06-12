@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////////////////////////
 ///                                                                                ///
-///  SIGNAL SCOPE FOR FM-DX-WEBSERVER (V0.5.2)                                     ///
+///  SIGNAL SCOPE FOR FM-DX-WEBSERVER (V0.5.3)                                     ///
 ///                                                                                ///
 ///  RF signal and audio modulation meter with broadcast-style status indicators.  ///
 ///                                                                                ///
@@ -19,7 +19,7 @@
     'use strict';
 
     const pluginName = 'Signal Scope';
-    const pluginVersion = '0.5.2';
+    const pluginVersion = '0.5.3';
     const AUDIO_SENSITIVITY = 520;
     const AUDIO_NOISE_FLOOR = 0.012;
     const CLIP_THRESHOLD = 98;
@@ -28,8 +28,18 @@
     const STORAGE_THEME = 'SIGNAL_SCOPE_THEME';
     const STORAGE_METER_STYLE = 'SIGNAL_SCOPE_METER_STYLE';
 
+    const STORAGE_GLOW = 'SIGNAL_SCOPE_GLOW';
+    const STORAGE_GLASS = 'SIGNAL_SCOPE_GLASS';
+    const STORAGE_SIZE = 'SIGNAL_SCOPE_SIZE';
+    const STORAGE_PEAK_DECAY = 'SIGNAL_SCOPE_PEAK_DECAY';
+
     const DEFAULT_THEME = 'webserver';
     const DEFAULT_METER_STYLE = 'classic';
+
+    const DEFAULT_GLOW = 'normal';
+    const DEFAULT_GLASS = 'off';
+    const DEFAULT_SIZE = 'normal';
+    const DEFAULT_PEAK_DECAY = 'normal';
 
     const VALID_THEMES = [
         'webserver',
@@ -37,7 +47,8 @@
         'dxGreen',
         'amberOrange',
         'arcticCyan',
-        'nightwishPurple'
+        'nightwishPurple',
+        'crazyCitrus'
     ];
 
     const VALID_METER_STYLES = [
@@ -46,6 +57,29 @@
         'led',
         'thin',
         'neon'
+    ];
+
+    const VALID_GLOW_LEVELS = [
+        'soft',
+        'normal',
+        'strong'
+    ];
+
+    const VALID_GLASS_MODES = [
+        'off',
+        'on'
+    ];
+
+    const VALID_SIZE_MODES = [
+        'mini',
+        'normal',
+        'xl'
+    ];
+
+    const VALID_PEAK_DECAY = [
+        'fast',
+        'normal',
+        'slow'
     ];
 
     const SIGNAL_SCOPE_THEMES = {
@@ -84,10 +118,22 @@
             low: '#9d7cff',
             mid: '#c084fc',
             high: '#f0abfc'
+        },
+        crazyCitrus: {
+            name: 'Crazy Citrus',
+            low: '#d7ff00',
+            mid: '#ffe600',
+            high: '#ff9d00'
         }
     };
     let activeThemeName = loadThemeName();
     let activeMeterStyle = loadMeterStyle();
+
+    let activeGlowLevel = loadGlowLevel();
+    let activeGlassMode = loadGlassMode();
+    let activeSizeMode = loadSizeMode();
+    let activePeakDecay = loadPeakDecay();
+    let themeTransition = 0;
 
     const pluginSetupOnlyNotify = true;
     const CHECK_FOR_UPDATES = true;
@@ -99,6 +145,11 @@
     let forcedMonoActive = false;
     let rdsActive = false;
     let rdsBlink = 0;
+
+    let ledFadeST = 0;
+    let ledFadeMO = 0;
+    let ledFadeRDS = 0;
+    let ledFadeCLIP = 0;
 
     let clipActive = false;
     let clipHold = 0;
@@ -133,7 +184,8 @@
         initAudio();
         startRenderLoop();
 
-        console.log(`[${pluginName}] v${pluginVersion} loaded`);
+        // Left for debugging purpose
+        // console.log(`[${pluginName}] v${pluginVersion} loaded`);
     });
 
     function cssVar(name, fallback) {
@@ -198,6 +250,22 @@
         };
     }
 
+    function loadGlowLevel() {
+        return loadEnum(STORAGE_GLOW, DEFAULT_GLOW, VALID_GLOW_LEVELS);
+    }
+
+    function loadGlassMode() {
+        return loadEnum(STORAGE_GLASS, DEFAULT_GLASS, VALID_GLASS_MODES);
+    }
+
+    function loadSizeMode() {
+        return loadEnum(STORAGE_SIZE, DEFAULT_SIZE, VALID_SIZE_MODES);
+    }
+
+    function loadPeakDecay() {
+        return loadEnum(STORAGE_PEAK_DECAY, DEFAULT_PEAK_DECAY, VALID_PEAK_DECAY);
+    }
+
     function getThemeColors() {
         const palette = getActiveThemePalette();
 
@@ -210,6 +278,97 @@
             panelBg: cssVar('--color-2-transparent', 'rgba(10, 25, 28, 0.95)'),
             border: cssVar('--color-3-transparent', 'rgba(200, 255, 255, 0.16)')
         };
+    }
+
+    function getGlowMultiplier() {
+        if (activeGlowLevel === 'soft') {
+            return 0.55;
+        }
+
+        if (activeGlowLevel === 'strong') {
+            return 1.55;
+        }
+
+        return 1.0;
+    }
+
+    function getPeakDecayRates() {
+        if (activePeakDecay === 'fast') {
+            return {
+                signal: 0.18,
+                audio: 0.24
+            };
+        }
+
+        if (activePeakDecay === 'slow') {
+            return {
+                signal: 0.045,
+                audio: 0.07
+            };
+        }
+
+        return {
+            signal: 0.09,
+            audio: 0.14
+        };
+    }
+
+    function getSizeConfig() {
+        if (activeSizeMode === 'mini') {
+            return {
+                panelHeight: '96px',
+                canvasWidth: 290,
+                canvasHeight: 64,
+                canvasCssWidth: '250px',
+                canvasCssHeight: '64px',
+                titleFontSize: '20px'
+            };
+        }
+
+        if (activeSizeMode === 'xl') {
+            return {
+                panelHeight: '145px',
+                canvasWidth: 360,
+                canvasHeight: 86,
+                canvasCssWidth: '98%',
+                canvasCssHeight: '86px',
+                titleFontSize: '30px'
+            };
+        }
+
+        return {
+            panelHeight: COMPACT_MODE ? '96px' : '123px',
+            canvasWidth: 320,
+            canvasHeight: COMPACT_MODE ? 44 : 74,
+            canvasCssWidth: COMPACT_MODE ? '260px' : '90%',
+            canvasCssHeight: COMPACT_MODE ? '44px' : '74px',
+            titleFontSize: COMPACT_MODE ? '22px' : ''
+        };
+    }
+
+    function applyGlassMode(panel) {
+        if (activeGlassMode === 'on') {
+            panel.style.background = 'rgba(8, 18, 26, 0.28)';
+            panel.style.backdropFilter = 'blur(8px)';
+            panel.style.borderRadius = '12px';
+            panel.style.boxShadow = 'inset 0 0 18px rgba(255,255,255,0.04), 0 0 18px rgba(0,0,0,0.22)';
+            return;
+        }
+
+        panel.style.background = 'transparent';
+        panel.style.backdropFilter = 'none';
+        panel.style.borderRadius = '0';
+        panel.style.boxShadow = 'none';
+    }
+
+    function bumpThemeTransition() {
+        themeTransition = 1;
+    }
+
+    function updateThemeTransition() {
+        if (themeTransition > 0) {
+            themeTransition = Math.max(0, themeTransition - 0.08);
+        }
     }
 
     function checkUpdate(setupOnly, pluginName, urlUpdateLink, urlFetchLink) {
@@ -316,7 +475,10 @@
         if (player.Amplification) {
             player.Amplification.connect(analyser);
             audioConnected = true;
-            console.log(`[${pluginName}] Audio analyser connected`);
+
+            // Left for debugging
+            // console.log(`[${pluginName}] Audio analyser connected`);
+
         } else {
             setTimeout(initAudio, 1000);
         }
@@ -355,11 +517,12 @@
         }
 
         const panel = document.createElement('div');
+        const size = getSizeConfig();
         panel.className = 'panel-33';
         panel.id = 'signal-scope-container';
         panel.title = `${pluginName} ${pluginVersion}`;
         panel.style.width = '33%';
-        panel.style.height = COMPACT_MODE ? '96px' : '123px';
+        panel.style.height = size.panelHeight;
         panel.style.position = 'relative';
         panel.style.overflow = 'hidden';
 
@@ -368,25 +531,29 @@
         title.style.letterSpacing = '1px';
 
         if (COMPACT_MODE) {
-            title.style.fontSize = '22px';
+            title.style.fontSize = size.titleFontSize;
             title.style.opacity = '0.85';
             title.style.marginTop = '8px';
             title.style.marginBottom = '0';
         } else {
             title.style.marginTop = '4px';
             title.style.marginBottom = '0';
+
+            if (size.titleFontSize) {
+                title.style.fontSize = size.titleFontSize;
+            }
         }
 
         panel.appendChild(title);
 
         canvas = document.createElement('canvas');
         canvas.id = 'signal-scope-canvas';
-        canvas.width = 320;
-        canvas.height = COMPACT_MODE ? 44 : 74;
+        canvas.width = size.canvasWidth;
+        canvas.height = size.canvasHeight;
         canvas.title = `${pluginName} ${pluginVersion}`;
-        canvas.style.width = COMPACT_MODE ? '260px' : '90%';
-        canvas.style.maxWidth = COMPACT_MODE ? '260px' : '340px';
-        canvas.style.height = COMPACT_MODE ? '44px' : '74px';
+        canvas.style.width = size.canvasCssWidth;
+        canvas.style.maxWidth = activeSizeMode === 'xl' ? '380px' : '340px';
+        canvas.style.height = size.canvasCssHeight;
         canvas.style.marginTop = COMPACT_MODE ? '-2px' : '0';
         canvas.style.marginLeft = COMPACT_MODE ? 'auto' : '0';
         canvas.style.marginRight = COMPACT_MODE ? 'auto' : '0';
@@ -400,6 +567,7 @@
         ctx = canvas.getContext('2d');
 
         createSettingsButton(panel);
+        applyGlassMode(panel);
 
         injectStyles();
     }
@@ -408,13 +576,6 @@
         const style = document.createElement('style');
 
         style.textContent = `
-        #signal-scope-container {
-            background: transparent !important;
-            backdrop-filter: none !important;
-            border-radius: 0;
-            box-shadow: none;
-        }
-
         #signal-scope-container h2 {
             text-shadow: none !important;
         }
@@ -443,8 +604,10 @@
             displayS += (targetS - displayS) * 0.18;
             displayA += (targetA - displayA) * 0.22;
 
-            peakS = Math.max(peakS - 0.09, displayS);
-            peakA = Math.max(peakA - 0.14, displayA);
+            const decay = getPeakDecayRates();
+
+            peakS = Math.max(peakS - decay.signal, displayS);
+            peakA = Math.max(peakA - decay.audio, displayA);
             if (displayA > CLIP_THRESHOLD) {
                 clipHold = 12;
                 clipActive = true;
@@ -454,11 +617,13 @@
             } else {
                 clipActive = false;
             }
+            updateThemeTransition();
             drawMeter(displayS, displayA);
         }, 75);
     }
 
     function drawMeter(sValue, aValue) {
+        const layout = getMeterLayout();
         if (!ctx || !canvas)
             return;
 
@@ -467,7 +632,7 @@
         drawIndicators();
         drawMeterBar({
             label: 'S',
-            y: COMPACT_MODE ? 5 : 18,
+            y: layout.sY,
             value: sValue,
             scale: COMPACT_MODE ? [] : ['1', '3', '5', '7', '9', '+20', '+40'],
             ticks: COMPACT_MODE ? [] : [10, 22, 34, 46, 58, 78, 98]
@@ -475,12 +640,33 @@
 
         drawMeterBar({
             label: 'A',
-            y: COMPACT_MODE ? 24 : 50,
+            y: layout.aY,
             value: aValue,
             scale: COMPACT_MODE ? [] : ['0', '25', '50', '75', '100'],
             ticks: COMPACT_MODE ? [] : [0, 25, 50, 75, 100]
         });
 
+        drawThemeTransitionFlash();
+
+    }
+
+    function drawThemeTransitionFlash() {
+        if (!themeTransition || themeTransition <= 0)
+            return;
+
+        const theme = getThemeColors();
+        const alpha = themeTransition * 0.22;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.shadowBlur = 18 * themeTransition;
+        ctx.shadowColor = theme.low;
+        ctx.strokeStyle = theme.low;
+        ctx.lineWidth = 2;
+
+        ctx.strokeRect(8, 6, canvas.width - 16, canvas.height - 12);
+
+        ctx.restore();
     }
 
     function drawSegmentedBar({
@@ -491,11 +677,11 @@
         ticks,
         ledMode = false
     }) {
-        const x = COMPACT_MODE ? 22 : 36;
-        const w = COMPACT_MODE ? 230 : 250;
-        const h = COMPACT_MODE ? 8 : 7;
+        const geo = getMeterGeometry(COMPACT_MODE ? 8 : 7);
+        const { x, w, h } = geo;
 
         const theme = getThemeColors();
+        const glow = getGlowMultiplier();
         const segments = ledMode ? (COMPACT_MODE ? 46 : 58) : (COMPACT_MODE ? 34 : 42);
         const gap = ledMode ? 3 : 2;
         const segmentW = (w - gap * (segments - 1)) / segments;
@@ -533,7 +719,7 @@
                 ctx.globalAlpha = 0.16;
             } else {
                 ctx.globalAlpha = 1;
-                ctx.shadowBlur = 6;
+                ctx.shadowBlur = 6 * glow;
                 ctx.shadowColor = ctx.fillStyle;
             }
 
@@ -549,7 +735,7 @@
 
         if (peakValue > 2) {
             ctx.strokeStyle = 'rgba(255,255,160,1)';
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = 8 * glow;
             ctx.shadowColor = 'rgba(255,255,180,0.95)';
             ctx.lineWidth = 2;
 
@@ -584,6 +770,51 @@
         }
     }
 
+    function getMeterLayout() {
+        if (activeSizeMode === 'mini') {
+            return {
+                sY: 14,
+                aY: 42
+            };
+        }
+
+        if (activeSizeMode === 'xl') {
+            return {
+                sY: 24,
+                aY: 62
+            };
+        }
+
+        return {
+            sY: COMPACT_MODE ? 5 : 18,
+            aY: COMPACT_MODE ? 24 : 50
+        };
+    }
+
+    function getMeterGeometry(defaultHeight) {
+        if (activeSizeMode === 'mini') {
+            return {
+                x: 42,
+                w: 205,
+                h: defaultHeight
+            };
+        }
+
+        if (activeSizeMode === 'xl') {
+            return {
+                x: 36,
+                w: 285,
+                h: defaultHeight + 1
+            };
+        }
+
+        return {
+            x: COMPACT_MODE ? 22 : 36,
+            w: COMPACT_MODE ? 230 : 250,
+            h: defaultHeight
+        };
+    }
+
     function createSettingsButton(panel) {
         const gear = document.createElement('div');
 
@@ -595,7 +826,7 @@
         gear.style.right = '10px';
         gear.style.fontSize = '15px';
         gear.style.cursor = 'pointer';
-        gear.style.opacity = '0.55';
+        gear.style.opacity = '0.18';
         gear.style.transition = 'opacity 0.15s ease';
         gear.style.userSelect = 'none';
         gear.style.zIndex = '20';
@@ -605,11 +836,12 @@
         });
 
         gear.addEventListener('mouseleave', () => {
-            gear.style.opacity = '0.55';
+            gear.style.opacity = settingsOpen ? '1' : '0.18';
         });
 
         gear.addEventListener('click', () => {
             toggleSettings(panel);
+            gear.style.opacity = settingsOpen ? '1' : '0.18';
         });
 
         panel.appendChild(gear);
@@ -660,7 +892,7 @@
         settingsPanel.style.minHeight = '190px';
         settingsPanel.style.maxHeight = '320px';
         settingsPanel.style.overflowY = 'auto';
-        settingsPanel.style.padding = '99999';
+        settingsPanel.style.padding = '12px';
         settingsPanel.style.borderRadius = '10px';
         settingsPanel.style.background = 'rgba(8,12,18,0.94)';
         settingsPanel.style.backdropFilter = 'blur(10px)';
@@ -675,25 +907,122 @@
         Signal Scope
     </div>
 
-    <label style="display:block;margin-bottom:5px;">Theme</label>
-    <select id="signal-scope-theme-select"
-        style="width:100%;margin-bottom:12px;padding:6px;border-radius:6px;">
-        ${VALID_THEMES.map(theme => `
-            <option value="${theme}" ${theme === activeThemeName ? 'selected' : ''}>
-                ${SIGNAL_SCOPE_THEMES[theme].name}
-            </option>
-        `).join('')}
-    </select>
+    <label style="display:block;margin-bottom:8px;">Theme</label>
 
-    <label style="display:block;margin-bottom:5px;">Meter Style</label>
-    <select id="signal-scope-style-select"
-        style="width:100%;margin-bottom:4px;padding:6px;border-radius:6px;">
-        ${VALID_METER_STYLES.map(style => `
-            <option value="${style}" ${style === activeMeterStyle ? 'selected' : ''}>
-                ${style.charAt(0).toUpperCase() + style.slice(1)}
-            </option>
-        `).join('')}
-    </select>
+<div id="signal-scope-theme-list" style="
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin-bottom:12px;
+">
+    ${buildThemeRows()}
+</div>
+
+  <label style="display:block;margin-bottom:8px;">Meter Style</label>
+
+<div id="signal-scope-style-list" style="
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+">
+    ${buildMeterStyleRows()}
+</div>
+
+<label style="display:block;margin-top:14px;margin-bottom:8px;">
+    Glow
+</label>
+
+<div style="
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+">
+    ${buildOptionRows([{
+                        label: 'Soft',
+                        value: 'soft',
+                        preview: '◐'
+                    }, {
+                        label: 'Normal',
+                        value: 'normal',
+                        preview: '◉'
+                    }, {
+                        label: 'Strong',
+                        value: 'strong',
+                        preview: '⬤'
+                    }
+                ], activeGlowLevel, 'glow')}
+</div>
+
+<label style="display:block;margin-top:14px;margin-bottom:8px;">
+    Peak Hold
+</label>
+
+<div style="
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+">
+    ${buildOptionRows([{
+                        label: 'Fast',
+                        value: 'fast',
+                        preview: '↘'
+                    }, {
+                        label: 'Normal',
+                        value: 'normal',
+                        preview: '→'
+                    }, {
+                        label: 'Slow',
+                        value: 'slow',
+                        preview: '⌁'
+                    }
+                ], activePeakDecay, 'peak')}
+</div>
+
+<label style="display:block;margin-top:14px;margin-bottom:8px;">
+    Glass Panel
+</label>
+
+<div style="
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+">
+    ${buildOptionRows([{
+                        label: 'Off',
+                        value: 'off',
+                        preview: '—'
+                    }, {
+                        label: 'On',
+                        value: 'on',
+                        preview: '◫'
+                    }
+                ], activeGlassMode, 'glass')}
+</div>
+
+<label style="display:block;margin-top:14px;margin-bottom:8px;">
+    Panel Size
+</label>
+
+<div style="
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+">
+    ${buildOptionRows([{
+                        label: 'Mini',
+                        value: 'mini',
+                        preview: '▁'
+                    }, {
+                        label: 'Normal',
+                        value: 'normal',
+                        preview: '▃'
+                    }, {
+                        label: 'XL',
+                        value: 'xl',
+                        preview: '▆'
+                    }
+                ], activeSizeMode, 'size')}
+</div>
 `;
         document.body.appendChild(settingsPanel);
 
@@ -702,26 +1031,95 @@
     }
 
     function initSettingsEvents() {
-        const themeSelect = document.getElementById('signal-scope-theme-select');
-        const styleSelect = document.getElementById('signal-scope-style-select');
+        document.querySelectorAll('.signal-scope-theme-row')
+        .forEach(row => {
+            row.addEventListener('click', () => {
+                const theme = row.dataset.theme;
 
-        if (themeSelect) {
-            themeSelect.addEventListener('change', e => {
-                activeThemeName = e.target.value;
-                safeLSSet(STORAGE_THEME, activeThemeName);
+                activeThemeName = theme;
+                safeLSSet(STORAGE_THEME, theme);
+                bumpThemeTransition();
 
-                console.log(`[${pluginName}] Theme changed to ${activeThemeName}`);
+                closeSettingsPanel();
+                createSettingsPanel(document.getElementById('signal-scope-container'));
             });
-        }
 
-        if (styleSelect) {
-            styleSelect.addEventListener('change', e => {
-                activeMeterStyle = e.target.value;
-                safeLSSet(STORAGE_METER_STYLE, activeMeterStyle);
-
-                console.log(`[${pluginName}] Meter style changed to ${activeMeterStyle}`);
+            row.addEventListener('mouseenter', () => {
+                row.style.background = 'rgba(255,255,255,0.08)';
             });
-        }
+
+            row.addEventListener('mouseleave', () => {
+                const active = row.dataset.theme === activeThemeName;
+
+                row.style.background = active
+                     ? 'rgba(255,255,255,0.10)'
+                     : 'rgba(255,255,255,0.03)';
+            });
+        });
+
+        document.querySelectorAll('.signal-scope-style-row')
+        .forEach(row => {
+            row.addEventListener('click', () => {
+                const style = row.dataset.style;
+
+                activeMeterStyle = style;
+                safeLSSet(STORAGE_METER_STYLE, style);
+
+                closeSettingsPanel();
+                createSettingsPanel(document.getElementById('signal-scope-container'));
+            });
+
+            row.addEventListener('mouseenter', () => {
+                row.style.background = 'rgba(255,255,255,0.08)';
+            });
+
+            row.addEventListener('mouseleave', () => {
+                const active = row.dataset.style === activeMeterStyle;
+
+                row.style.background = active
+                     ? 'rgba(255,255,255,0.10)'
+                     : 'rgba(255,255,255,0.03)';
+            });
+        });
+
+        document.querySelectorAll('.signal-scope-option-row')
+        .forEach(row => {
+            row.addEventListener('click', () => {
+                const type = row.dataset.type;
+                const value = row.dataset.value;
+
+                if (type === 'glow') {
+                    activeGlowLevel = value;
+                    safeLSSet(STORAGE_GLOW, value);
+                }
+
+                if (type === 'peak') {
+                    activePeakDecay = value;
+                    safeLSSet(STORAGE_PEAK_DECAY, value);
+                }
+
+                if (type === 'glass') {
+                    activeGlassMode = value;
+                    safeLSSet(STORAGE_GLASS, value);
+
+                    const panel = document.getElementById('signal-scope-container');
+
+                    if (panel) {
+                        applyGlassMode(panel);
+                    }
+                }
+
+                if (type === 'size') {
+                    activeSizeMode = value;
+                    safeLSSet(STORAGE_SIZE, value);
+                    location.reload();
+                    return;
+                }
+
+                closeSettingsPanel();
+                createSettingsPanel(document.getElementById('signal-scope-container'));
+            });
+        });
     }
 
     function drawLedBar(options) {
@@ -773,12 +1171,12 @@
         scale,
         ticks
     }) {
-        const x = COMPACT_MODE ? 22 : 36;
-        const w = COMPACT_MODE ? 230 : 250;
-        const h = COMPACT_MODE ? 4 : 4;
+        const geo = getMeterGeometry(4);
+        const { x, w, h } = geo;
 
         const fillW = clamp((value / 100) * w, 0, w);
         const theme = getThemeColors();
+        const glow = getGlowMultiplier();
 
         ctx.font = 'bold 11px Arial, sans-serif';
         ctx.fillStyle = theme.text;
@@ -796,7 +1194,7 @@
         gradient.addColorStop(0.7, theme.mid);
         gradient.addColorStop(1.0, theme.high);
 
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = 6 * glow;
         ctx.shadowColor = theme.low;
         ctx.fillStyle = gradient;
         ctx.fillRect(x, y + 2, fillW, h);
@@ -807,13 +1205,14 @@
 
         if (peakValue > 2) {
             ctx.strokeStyle = 'rgba(255,255,180,1)';
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = 8 * glow;
             ctx.shadowColor = 'rgba(255,255,180,0.75)';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(peakX, y - 1);
             ctx.lineTo(peakX, y + h + 5);
             ctx.stroke();
+            ctx.shadowBlur = 0;
         }
     }
 
@@ -824,12 +1223,11 @@
         scale,
         ticks
     }) {
-        const x = COMPACT_MODE ? 22 : 36;
-        const w = COMPACT_MODE ? 230 : 250;
-        const h = COMPACT_MODE ? 9 : 8;
-
+        const geo = getMeterGeometry(COMPACT_MODE ? 9 : 8);
+        const { x, w, h } = geo;
         const fillW = clamp((value / 100) * w, 0, w);
         const theme = getThemeColors();
+        const glow = getGlowMultiplier();
 
         ctx.font = 'bold 11px Arial, sans-serif';
         ctx.fillStyle = theme.text;
@@ -845,7 +1243,7 @@
         gradient.addColorStop(0.86, theme.high);
         gradient.addColorStop(1.0, theme.danger);
 
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 12 * glow;
         ctx.shadowColor = theme.low;
         ctx.fillStyle = gradient;
         roundRect(ctx, x, y, fillW, h, h / 2, true, false);
@@ -859,7 +1257,7 @@
 
         if (peakValue > 2) {
             ctx.fillStyle = 'rgba(255,255,220,1)';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = 10 * glow;
             ctx.shadowColor = 'rgba(255,255,180,0.95)';
             roundRect(ctx, peakX - 2, y - 3, 4, h + 6, 2, true, false);
             ctx.shadowBlur = 0;
@@ -912,6 +1310,166 @@
         });
     }
 
+    function getStylePreviewColor(style) {
+        const theme = getThemeColors();
+
+        if (style === 'classic') {
+            return theme.low;
+        }
+
+        if (style === 'segmented') {
+            return theme.mid;
+        }
+
+        if (style === 'led') {
+            return theme.high;
+        }
+
+        if (style === 'thin') {
+            return theme.low;
+        }
+
+        if (style === 'neon') {
+            return theme.low;
+        }
+
+        return theme.text;
+    }
+
+    function getThemePreviewColor(themeName) {
+        const theme = SIGNAL_SCOPE_THEMES[themeName];
+
+        if (theme && theme.low) {
+            return theme.low;
+        }
+
+        return cssVar('--color-5', '#00ff66');
+    }
+
+    function buildThemeRows() {
+        return VALID_THEMES.map(themeName => {
+            const active = themeName === activeThemeName;
+            const color = getThemePreviewColor(themeName);
+            const label = SIGNAL_SCOPE_THEMES[themeName].name;
+
+            return `
+            <div class="signal-scope-theme-row"
+                 data-theme="${themeName}"
+                 style="
+                    display:flex;
+                    align-items:center;
+                    gap:9px;
+                    padding:7px 10px;
+                    border-radius:8px;
+                    cursor:pointer;
+                    transition:all 0.15s ease;
+                    background:${active ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.03)'};
+                    border:${active ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.06)'};
+                 ">
+                <span style="
+                    width:12px;
+                    height:12px;
+                    border-radius:3px;
+                    background:${color};
+                    box-shadow:0 0 8px ${color};
+                    flex-shrink:0;
+                "></span>
+
+                <span style="
+                    font-size:13px;
+                    color:var(--color-text);
+                ">
+                    ${label}
+                </span>
+            </div>
+        `;
+        }).join('');
+    }
+
+    function buildMeterStyleRows() {
+        const styles = {
+            classic: '━━━━━━━',
+            segmented: '▮ ▮ ▮ ▮',
+            led: '▮▮▮▮▮▮▮',
+            thin: '───────',
+            neon: '▬▬▬▬▬▬▬'
+        };
+
+        return VALID_METER_STYLES.map(style => {
+            const active = style === activeMeterStyle;
+
+            return `
+            <div class="signal-scope-style-row"
+                 data-style="${style}"
+                 style="
+                    display:flex;
+                    justify-content:space-between;
+                    align-items:center;
+                    padding:7px 10px;
+                    border-radius:8px;
+                    cursor:pointer;
+                    transition:all 0.15s ease;
+                    background:${active ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.03)'};
+                    border:${active ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.06)'};
+                 ">
+                <span style="
+                    font-size:13px;
+                    color:var(--color-text);
+                ">
+                    ${style.charAt(0).toUpperCase() + style.slice(1)}
+                </span>
+                <span style="
+                    font-family:monospace;
+                    letter-spacing:1px;
+                    opacity:0.95;
+                    color:${getStylePreviewColor(style)};
+                    text-shadow:0 0 8px ${getStylePreviewColor(style)};
+                ">
+                    ${styles[style]}
+                </span>
+            </div>
+        `;
+        }).join('');
+
+    }
+
+    function buildOptionRows(options, activeValue, type) {
+        return options.map(option => {
+            const active = option.value === activeValue;
+
+            return `
+        <div class="signal-scope-option-row"
+             data-type="${type}"
+             data-value="${option.value}"
+             style="
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                padding:7px 10px;
+                border-radius:8px;
+                cursor:pointer;
+                transition:all 0.15s ease;
+                background:${active ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.03)'};
+                border:${active ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.06)'};
+             ">
+            <span style="
+                font-size:13px;
+                color:var(--color-text);
+            ">
+                ${option.label}
+            </span>
+
+            <span style="
+                opacity:0.82;
+                font-size:12px;
+            ">
+                ${option.preview || ''}
+            </span>
+        </div>
+    `;
+        }).join('');
+    }
+
     function drawMeterBar(options) {
         switch (activeMeterStyle) {
         case 'segmented':
@@ -944,12 +1502,12 @@
         scale,
         ticks
     }) {
-        const x = COMPACT_MODE ? 22 : 36;
-        const w = COMPACT_MODE ? 230 : 250;
-        const h = COMPACT_MODE ? 8 : 7;
+        const geo = getMeterGeometry(COMPACT_MODE ? 8 : 7);
+        const { x, w, h } = geo;
 
         const fillW = clamp((value / 100) * w, 0, w);
         const theme = getThemeColors();
+        const glow = getGlowMultiplier();
 
         ctx.font = 'bold 11px Arial, sans-serif';
         ctx.fillStyle = theme.text;
@@ -968,7 +1526,7 @@
         gradient.addColorStop(0.84, theme.high);
         gradient.addColorStop(1.0, theme.danger);
 
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 8 * glow;
         ctx.shadowColor = 'rgba(0,255,160,0.35)';
         ctx.fillStyle = gradient;
         ctx.fillRect(x, y, fillW, h);
@@ -990,7 +1548,7 @@
             ctx.stroke();
 
             // Bright peak line
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = 8 * glow;
             ctx.shadowColor = 'rgba(255,255,180,0.95)';
             ctx.strokeStyle = 'rgba(255,255,160,1)';
             ctx.lineWidth = 2;
@@ -1076,31 +1634,50 @@
         const startX = 62;
         const y = 8;
 
-        drawLed(startX, y, stereoActive, 'ST', '#7dff7d');
-        drawLed(startX + 48, y, monoActive, 'MO', '#9dc8ff');
-        drawLed(startX + 96, y, rdsActive, 'RDS', '#7ddcff', rdsBlink > 0);
-        drawLed(startX + 154, y, clipActive, 'CLIP', '#ff4a4a', clipActive);
+        ledFadeST = updateLedFade(ledFadeST, stereoActive);
+        ledFadeMO = updateLedFade(ledFadeMO, monoActive);
+        ledFadeRDS = updateLedFade(ledFadeRDS, rdsActive);
+        ledFadeCLIP = updateLedFade(ledFadeCLIP, clipActive);
+
+        drawLed(startX, y, stereoActive, 'ST', '#7dff7d', false, ledFadeST);
+        drawLed(startX + 48, y, monoActive, 'MO', '#9dc8ff', false, ledFadeMO);
+        drawLed(startX + 96, y, rdsActive, 'RDS', '#7ddcff', rdsBlink > 0, ledFadeRDS);
+        drawLed(startX + 154, y, clipActive, 'CLIP', '#ff4a4a', clipActive, ledFadeCLIP);
     }
 
-    function drawLed(x, y, active, label, color, blink = false) {
+    function updateLedFade(current, active) {
+        if (active) {
+            return Math.min(1, current + 0.22);
+        }
+
+        return Math.max(0, current - 0.06);
+    }
+
+    function drawLed(x, y, active, label, color, blink = false, fade = 0) {
         ctx.font = 'bold 10px Arial, sans-serif';
         ctx.textAlign = 'left';
 
         const blinkBoost = blink && (Math.floor(Date.now() / 220) % 2 === 0);
+        const breathing = active && !blink
+             ? 0.75 + Math.sin(Date.now() / 420) * 0.25
+             : 1;
 
         const size = 8;
 
-        if (active || blinkBoost) {
+        if (active || blinkBoost || fade > 0) {
+            ctx.globalAlpha = Math.max(fade, blinkBoost ? 1 : 0.25);
             ctx.fillStyle = color;
-            ctx.shadowBlur = blinkBoost ? 18 : 12;
+            ctx.shadowBlur = blinkBoost ? 18 : (10 + (6 * breathing)) * Math.max(fade, 0.35);
             ctx.shadowColor = color;
         } else {
+            ctx.globalAlpha = 1;
             ctx.fillStyle = 'rgba(120,120,120,0.25)';
             ctx.shadowBlur = 0;
         }
 
         // Square LED
         ctx.fillRect(x - size / 2, y - size / 2, size, size);
+        ctx.globalAlpha = 1;
 
         ctx.shadowBlur = 0;
 
