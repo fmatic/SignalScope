@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////////////////////////
 ///                                                                                ///
-///  SIGNAL SCOPE FOR FM-DX-WEBSERVER (V0.5.4)                                     ///
+///  SIGNAL SCOPE FOR FM-DX-WEBSERVER (V0.6.0)                                     ///
 ///                                                                                ///
 ///  RF signal and audio modulation meter with broadcast-style status indicators.  ///
 ///                                                                                ///
@@ -19,7 +19,7 @@
     'use strict';
 
     const pluginName = 'Signal Scope';
-    const pluginVersion = '0.5.4';
+    const pluginVersion = '0.6.0';
     const AUDIO_SENSITIVITY = 520;
     const AUDIO_NOISE_FLOOR = 0.012;
     const CLIP_THRESHOLD = 98;
@@ -42,6 +42,13 @@
     const DEFAULT_SIZE = 'normal';
     const DEFAULT_PEAK_DECAY = 'normal';
     const DEFAULT_VALUE_TEXT = 'off';
+
+    const STORAGE_ACTIVITY_STRIP = 'SIGNAL_SCOPE_ACTIVITY_STRIP';
+    const DEFAULT_ACTIVITY_STRIP = 'on';
+    const VALID_ACTIVITY_STRIP = [
+        'off',
+        'on'
+    ];
 
     const VALID_THEMES = [
         'webserver',
@@ -183,6 +190,10 @@
     let settingsOutsideHandler = null;
     let settingsKeyHandler = null;
 
+    let activityHistory = new Array(48).fill(0);
+    let activeActivityStrip = loadActivityStrip();
+    let crtDriftPhase = 0;
+
     if (CHECK_FOR_UPDATES) {
         checkUpdate(pluginSetupOnlyNotify, pluginName, pluginHomepageUrl, pluginUpdateUrl);
     }
@@ -241,6 +252,10 @@
         }
 
         return loadEnum(STORAGE_METER_STYLE, DEFAULT_METER_STYLE, VALID_METER_STYLES);
+    }
+
+    function loadActivityStrip() {
+        return loadEnum(STORAGE_ACTIVITY_STRIP, DEFAULT_ACTIVITY_STRIP, VALID_ACTIVITY_STRIP);
     }
 
     function getActiveThemePalette() {
@@ -339,21 +354,21 @@
 
         if (activeSizeMode === 'xl') {
             return {
-                panelHeight: '145px',
+                panelHeight: '155px',
                 canvasWidth: 360,
-                canvasHeight: 86,
+                canvasHeight: 96,
                 canvasCssWidth: '98%',
-                canvasCssHeight: '86px',
+                canvasCssHeight: '96px',
                 titleFontSize: '30px'
             };
         }
 
         return {
-            panelHeight: COMPACT_MODE ? '96px' : '123px',
+            panelHeight: COMPACT_MODE ? '96px' : '132px',
             canvasWidth: 320,
-            canvasHeight: COMPACT_MODE ? 44 : 74,
+            canvasHeight: COMPACT_MODE ? 44 : 84,
             canvasCssWidth: COMPACT_MODE ? '260px' : '90%',
-            canvasCssHeight: COMPACT_MODE ? '44px' : '74px',
+            canvasCssHeight: COMPACT_MODE ? '44px' : '84px',
             titleFontSize: COMPACT_MODE ? '22px' : ''
         };
     }
@@ -647,6 +662,15 @@
             } else {
                 clipActive = false;
             }
+            const activity =
+                (displayS * 0.55) +
+            (displayA * 0.45);
+
+            activityHistory.push(activity);
+
+            if (activityHistory.length > 48) {
+                activityHistory.shift();
+            }
             updateThemeTransition();
             drawMeter(displayS, displayA);
         }, 75);
@@ -660,6 +684,8 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         updateIndicators();
         drawIndicators();
+        drawCrtAtmosphere();
+        drawActivityStrip();
         drawMeterBar({
             label: 'S',
             y: layout.sY,
@@ -816,24 +842,100 @@
         }
     }
 
+    function drawCrtAtmosphere() {
+        if (!ctx || !canvas || activeActivityStrip !== 'on') {
+            return;
+        }
+
+        const theme = getThemeColors();
+        const weakSignal = displayS < 25;
+        const locked = stereoActive || rdsActive;
+
+        crtDriftPhase += 0.015;
+
+        ctx.save();
+
+        // Ultra subtle scanlines
+        ctx.globalAlpha = 0.055;
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.lineWidth = 1;
+
+        for (let y = 14; y < canvas.height - 6; y += 4) {
+            ctx.beginPath();
+            ctx.moveTo(28, y);
+            ctx.lineTo(canvas.width - 28, y);
+            ctx.stroke();
+        }
+
+        // Phosphor persistence glow
+        const glow = ctx.createRadialGradient(
+                canvas.width / 2,
+                canvas.height / 2,
+                8,
+                canvas.width / 2,
+                canvas.height / 2,
+                canvas.width * 0.62);
+
+        glow.addColorStop(0, locked ? 'rgba(120,255,210,0.035)' : 'rgba(120,220,255,0.025)');
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Stereo/RDS lock shimmer
+        if (locked) {
+            const shimmerX = 36 + ((Date.now() / 55) % (canvas.width - 72));
+
+            const shimmer = ctx.createLinearGradient(shimmerX - 30, 0, shimmerX + 30, 0);
+            shimmer.addColorStop(0, 'rgba(255,255,255,0)');
+            shimmer.addColorStop(0.5, theme.low);
+            shimmer.addColorStop(1, 'rgba(255,255,255,0)');
+
+            ctx.globalAlpha = 0.045;
+            ctx.strokeStyle = shimmer;
+            ctx.lineWidth = 1;
+
+            ctx.beginPath();
+            ctx.moveTo(36, 18);
+            ctx.lineTo(canvas.width - 36, 18);
+            ctx.stroke();
+        }
+
+        // Tiny RF sparkles for weak DX
+        if (weakSignal) {
+            ctx.globalAlpha = 0.12;
+            ctx.fillStyle = theme.low;
+
+            for (let i = 0; i < 3; i++) {
+                const x = 36 + Math.random() * (canvas.width - 72);
+                const y = 18 + Math.random() * 42;
+
+                ctx.fillRect(x, y, 1, 1);
+            }
+        }
+
+        ctx.restore();
+    }
+
     function getMeterLayout() {
         if (activeSizeMode === 'mini') {
             return {
-                sY: 13,
-                aY: 40
+                sY: 16,
+                aY: 42
             };
         }
 
         if (activeSizeMode === 'xl') {
             return {
-                sY: 24,
-                aY: 62
+                sY: 30,
+                aY: 68
             };
         }
 
         return {
-            sY: COMPACT_MODE ? 5 : 18,
-            aY: COMPACT_MODE ? 24 : 50
+            sY: COMPACT_MODE ? 7 : 26,
+            aY: COMPACT_MODE ? 27 : 60
         };
     }
 
@@ -1043,6 +1145,25 @@ ${buildSectionLabel('Value Text')}
                 ], activeValueText, 'valueText')}
 </div>
 
+${buildSectionLabel('Activity Strip')}
+
+<div style="
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+">
+    ${buildOptionRows([{
+                        label: 'Off',
+                        value: 'off',
+                        preview: '—'
+                    }, {
+                        label: 'On',
+                        value: 'on',
+                        preview: '〰'
+                    }
+                ], activeActivityStrip, 'activityStrip')}
+</div>
+
 ${buildSectionLabel('Glass Panel')}
 
 <div style="
@@ -1162,6 +1283,10 @@ ${buildSectionLabel('Panel Size')}
                 if (type === 'valueText') {
                     activeValueText = value;
                     safeLSSet(STORAGE_VALUE_TEXT, value);
+                }
+                if (type === 'activityStrip') {
+                    activeActivityStrip = value;
+                    safeLSSet(STORAGE_ACTIVITY_STRIP, value);
                 }
 
                 if (type === 'glass') {
@@ -1580,6 +1705,92 @@ ${buildSectionLabel('Panel Size')}
         </div>
     `;
         }).join('');
+    }
+
+    function drawActivityStrip() {
+        if (activeActivityStrip !== 'on') {
+            return;
+        }
+        if (!ctx)
+            return;
+
+        const theme = getThemeColors();
+
+        const layout = getMeterLayout();
+        const geo = getMeterGeometry(4);
+        const lockFactor = (stereoActive || rdsActive) ? 0.65 : 1.0;
+        const weakFactor = displayS < 25 ? 1.45 : 1.0;
+        const audioPulse = displayA > 70 ? 1.35 : 1.0;
+        const startX = geo.x;
+        const width = geo.w;
+        const y = activeSizeMode === 'mini'
+             ? layout.sY - 4
+             : layout.sY - 8;
+        ctx.save();
+
+        ctx.beginPath();
+
+        activityHistory.forEach((v, i) => {
+            const x = startX + (i / (activityHistory.length - 1)) * width;
+
+            const normalized = v / 100;
+
+            const lockFactor = (stereoActive || rdsActive) ? 0.65 : 1.0;
+            const weakFactor = displayS < 25 ? 1.45 : 1.0;
+            const audioPulse = displayA > 70 ? 1.35 : 1.0;
+
+            const wave =
+                Math.sin((Date.now() / 520) + (i * 0.34)) *
+                0.55 *
+                lockFactor *
+                weakFactor *
+                audioPulse;
+
+            const h =
+                ((normalized * 2.4) * audioPulse) + wave;
+
+            const py = y - h;
+
+            if (i === 0) {
+                ctx.moveTo(x, py);
+            } else {
+                ctx.lineTo(x, py);
+            }
+        });
+
+        const gradient = ctx.createLinearGradient(startX, 0, startX + width, 0);
+
+        gradient.addColorStop(0.0, 'rgba(255,255,255,0)');
+        gradient.addColorStop(0.12, theme.low);
+        gradient.addColorStop(0.5, theme.mid);
+        gradient.addColorStop(0.88, theme.low);
+        gradient.addColorStop(1.0, 'rgba(255,255,255,0)');
+
+        // Soft shadow trail
+        ctx.save();
+
+        ctx.globalAlpha = 0.08;
+        ctx.strokeStyle = theme.low;
+
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 3;
+
+        ctx.translate(0, 1.5);
+        ctx.stroke();
+
+        ctx.restore();
+
+        // Main line
+        ctx.strokeStyle = gradient;
+        ctx.globalAlpha = displayA > 70 ? 0.34 : 0.26;
+
+        ctx.shadowBlur = 8 * getGlowMultiplier();
+        ctx.shadowColor = theme.low;
+
+        ctx.lineWidth = 1.1;
+        ctx.stroke();
+
+        ctx.restore();
     }
 
     function drawMeterBar(options) {
