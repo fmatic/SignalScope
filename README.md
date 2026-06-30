@@ -2,7 +2,7 @@
 
 ![Release](https://img.shields.io/github/v/release/fmatic/BroadcastMeter?display_name=tag&style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-browser-green?style=flat-square)
-![Version](https://img.shields.io/badge/version-0.5.0-00c8ff?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.6.0-00c8ff?style=flat-square)
 [![Support my work](https://img.shields.io/badge/Support-My%20Work-333333?style=flat-square&logo=buymeacoffee&logoColor=white)](https://buymeacoffee.com/jannedx)
 
 
@@ -24,6 +24,11 @@ It combines broadcast-style metering, stereo/RDS indicators and customizable vis
 - Theme system
 - Optional glass panel effect
 - Optional live meter value text
+- Optional Activity Strip visualization
+- CRT-inspired visual atmosphere
+- Scanline and phosphor effects
+- Stereo/RDS shimmer effect
+- Weak signal RF sparkles
 - Native FM-DX-Webserver visual integration
 - Compact and lightweight
 - Mobile friendly
@@ -65,6 +70,12 @@ Current settings:
 
 - Theme selection
 - Meter style selection
+- Glow intensity
+- Peak Hold speed
+- Value text
+- Activity Strip
+- Glass panel mode
+- Panel size
 
 Settings are stored locally in browser localStorage.
 
@@ -73,6 +84,12 @@ Settings are stored locally in browser localStorage.
 ```js
 SIGNAL_SCOPE_THEME
 SIGNAL_SCOPE_METER_STYLE
+SIGNAL_SCOPE_GLOW
+SIGNAL_SCOPE_GLASS
+SIGNAL_SCOPE_SIZE
+SIGNAL_SCOPE_PEAK_DECAY
+SIGNAL_SCOPE_VALUE_TEXT
+SIGNAL_SCOPE_ACTIVITY_STRIP
 ```
 
 Example:
@@ -92,6 +109,7 @@ dxGreen
 amberOrange
 arcticCyan
 nightwishPurple
+crazyCitrus
 ```
 
 ## Supported Meter Styles
@@ -104,7 +122,30 @@ thin
 neon
 ```
 
-## What's Nse
+## What's New
+
+v0.6.0
+
+This release introduces the new Activity Strip system and major visual atmosphere enhancements inspired by broadcast instrumentation and CRT-style signal monitoring.
+
+New:
+- Activity Strip visualization
+- CRT-style atmospheric rendering
+- Ultra subtle scanline overlay
+- Phosphor persistence glow
+- Stereo/RDS shimmer effect
+- Weak signal RF sparkle effects
+- Audio peak pulse response
+- Dynamic movement based on signal conditions
+- Activity Strip settings toggle
+
+Improved:
+- Neon meter appearance
+- Mobile Safari rendering
+- Glow rendering consistency
+- Meter animation smoothness
+- Broadcast-style visual depth
+- Overall UI polish and visual atmosphere
 
 v0.5.4
 
@@ -140,14 +181,13 @@ Improved:
 
 ## Roadmap
 
-### v0.5.3
+### v0.6.x
 
-- Animated theme transitions
-- Optional glass panel
-- Optional stronger glow
-- Compact XL / Mini modes
-- Peak hold speed control
-- LED brightness control
+- DX Storm visual mode
+- Optional analog CRT drift
+- Optional spectrum pulse effects
+- Vertical compact mode
+- Advanced shimmer profiles
 
 ## Future Ideas
 
@@ -156,6 +196,8 @@ Improved:
 - Analog needle mode
 - Oscilloscope waveform mode
 - Stereo image meter
+- RF turbulence visualization
+- Broadcast rack mode
 
 ## Credits
 
